@@ -1,0 +1,11 @@
+#!/bin/sh 
+
+uci -q batch <<-EOF >/dev/null
+          delete ucitrack.@guest-wifi-ntagmod[-1]
+          add ucitrack guest-wifi-ntagmod
+          set ucitrack.@guest-wifi-ntagmod[-1].init=guest-wifi-ntagmod
+          commit ucitrack
+EOF
+
+rm -f /tmp/luci-indexcache
+exit 0
