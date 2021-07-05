@@ -53,7 +53,7 @@ use_ntag.rmempty = false
 
 use_random_passwd = s:option(Flag, "use_random_passwd", translate("Use random Wi-Fi password"), translate("Generate random password at startup"))
 use_random_passwd.default = false
-use_random_passwd:depends("use_ntag")
+use_random_passwd:depends("use_ntag", 1)
 
 isolate = s:option(ListValue, "isolate", translate("Isolation"), translate("Enalbe or disable isolation"))
 isolate:value("1", translate("YES"))
