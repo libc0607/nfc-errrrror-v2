@@ -13,4 +13,4 @@ config guest-wifi-ntagmod
 	option device 'radio0'
 	option create '0'
 	option use_ntag '0'
-
+	option use_random_passwd '0'

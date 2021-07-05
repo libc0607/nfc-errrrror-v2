@@ -1,8 +1,8 @@
 #!/bin/sh /etc/rc.common
 # Copyright (C) 2015
 # Must keep author's information if you use this file.
-
-# NTag dirty mod by Github @libc0607
+#
+# NTag dirty mod by @libc0607
 
 START=50
 
@@ -22,12 +22,15 @@ leasetime=$(uci get guest-wifi-ntagmod.@guest-wifi-ntagmod[0].leasetime)
 device=$(uci get guest-wifi-ntagmod.@guest-wifi-ntagmod[0].device)
 create=$(uci get guest-wifi-ntagmod.@guest-wifi-ntagmod[0].create)
 use_ntag=$(uci get guest-wifi-ntagmod.@guest-wifi-ntagmod[0].use_ntag)
+use_random_passwd=$(uci get guest-wifi-ntagmod.@guest-wifi-ntagmod[0].use_random_passwd)
 
 start() {
 	[ $enabled = 1 ] && {
 		[ $create = 1 ] && {
 			[ -f /etc/config/guestwifi-ntagmod/guest_del ] || echo "#! /bin/sh" > ${HISTORY_DIR}/guest_del
 			chmod 0755 ${HISTORY_DIR}/guest_del
+			[ -f /etc/config/guestwifi-ntagmod/guest_change_passwd ] || echo "#! /bin/sh" > ${HISTORY_DIR}/guest_change_passwd
+			chmod 0755 ${HISTORY_DIR}/guest_change_passwd
 			add_interface
 			add_ssid
 			mod_dhcp
@@ -38,6 +41,9 @@ start() {
 		uci commit guest-wifi-ntagmod
 		uci del wireless.$interface_name.disabled
 		uci commit wireless
+		[ $use_random_passwd = 1 ] && {
+			${HISTORY_DIR}/guest_change_passwd
+		}
 		wifi
 		update_ntag
 	}
@@ -58,6 +64,7 @@ stop() {
 			uci commit firewall
 			/etc/config/guestwifi-ntagmod/guest_del
 			rm -rf /etc/config/guestwifi-ntagmod/guest_del
+			rm -rf /etc/config/guestwifi-ntagmod/guest_change_passwd
 			/etc/init.d/network restart
 		}
 		uci set guest-wifi-ntagmod.@guest-wifi-ntagmod[0].create='0'
@@ -82,8 +89,9 @@ update_ntag() {
 			ntag_path=$(mount|grep -s $ntag_dev_path|cut -d ' ' -f 3)
 			[ -d $ntag_path ] && {
 				echo "Ntag mounted at $ntag_path, updating..."
+				pwd_volatile=$(uci get guest-wifi-ntagmod.@guest-wifi-ntagmod[0].passwd)
 				[ -f $ntag_path/WIFISSID.TXT ] && echo -e "$wifi_name\r\n" > $ntag_path/WIFISSID.TXT
-				[ -f $ntag_path/WIFIPWD.TXT ] && echo -e "$passwd\r\n" > $ntag_path/WIFIPWD.TXT
+				[ -f $ntag_path/WIFIPWD.TXT ] && echo -e "$pwd_volatile\r\n" > $ntag_path/WIFIPWD.TXT
 				if [ "$encryption" = "psk" ]; then
 					[ -f $ntag_path/WIFIAUTH.TXT ] && echo -e "wpapsk\r\n" > $ntag_path/WIFIAUTH.TXT
 					[ -f $ntag_path/WIFIENC.TXT ] && echo -e "aestkip\r\n" > $ntag_path/WIFIENC.TXT
@@ -143,6 +151,12 @@ add_ssid() {
 		uci set wireless.$interface_name.isolate="$isolate"
 		if [ "$encryption" != "none" ]; then
 			uci set wireless.$interface_name.key="$passwd"
+			echo "rand_pwd=\$(head -c 12 /dev/urandom | base64 | head -c 8)" >> ${HISTORY_DIR}/guest_change_passwd
+			echo "echo \"New guest Wi-Fi password: \$rand_pwd\"" >> ${HISTORY_DIR}/guest_change_passwd
+			echo "uci set wireless.$interface_name.key=\$rand_pwd" >> ${HISTORY_DIR}/guest_change_passwd
+			echo "uci set guest-wifi-ntagmod.@guest-wifi-ntagmod[0].passwd=\$rand_pwd" >> ${HISTORY_DIR}/guest_change_passwd
+			echo "uci commit wireless" >> ${HISTORY_DIR}/guest_change_passwd
+			echo "uci commit guest-wifi-ntagmod" >> ${HISTORY_DIR}/guest_change_passwd
 		fi
 		echo "uci del wireless.$interface_name" >> ${HISTORY_DIR}/guest_del
 		echo "uci commit wireless" >> ${HISTORY_DIR}/guest_del
